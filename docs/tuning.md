@@ -37,6 +37,40 @@ aci ve isik kosullarinda farkli degerler cikar.
 - Kalorifer buhari, sigara dumani, temizlik buhari
 - Kamera lensinde yansima veya kir
 - Otomatik pozlama sonrasi ani parlaklik degisimi
+- **Yazici/elektronik cihaz isisi-parliltisi** - asagidaki teste bakin
 
 Bunlarin ornek karelerini kaydedip test setine eklemek, esik ayarini tahminden
 cikarir.
+
+## Gercek veriyle yapilan test (Kaggle unidpro/fire-and-smoke-dataset)
+
+`fire_smoke.pt` (luminous0219/fire-and-smoke-detection-yolov8) varsayilan
+ayarlarla (`conf_threshold=0.45`, `window=8`, `min_hits=5`, `target_fps=4`)
+3 gercek etiketli video uzerinde test edildi:
+
+| Video | Gercek olay | Sistem alarmi | Gecikme | SPEC (<=5sn) |
+|---|---|---|---|---|
+| `printer31` | duman, 27sn | **1.2sn (sahte alarm)** | - | Basarisiz - gercek olaydan once sahte alarm |
+| `bucket11` | ates, 9sn (kucuk alev) | 38.4sn | 29.4sn | Basarisiz - gec kaliyor |
+| `roomfire41` | duman, 776sn | 780sn | 4sn | Basarili |
+| `roomfire41` | ates, 787sn | 794.4sn | 7.4sn | Sinirda basarisiz |
+
+**Cikarilan dersler:**
+
+1. **Yazici isisi/parliltisi surekli bir yanlis "duman" sinyali uretiyor**
+   (guven ~0.45-0.65 araliginda, video basindan itibaren surekli). Zamansal
+   dogrulama (window+min_hits) bunu FILTRELEMIYOR, cunku sinyal izole degil,
+   surekli - `Confirmer` sadece tek karelik/aralikli yanlis pozitifleri
+   eler (bkz. `roomfire41`'deki izole yanlis pozitifler basariyla elendi).
+   Kamera acisinda yazici/elektronik cihaz gibi surekli isi kaynagi varsa
+   ya ROI ile kadraj disi birakilmali ya da o kamera icin esik ayrica
+   yukseltilmeli.
+2. **Kucuk/uzak alev gec tespit ediliyor** (`bucket11`: etiketlerde alev
+   bolgesi birkac piksel genisliginde). Bu, SPEC.md risk tablosundaki
+   "kamera acisinda duman kucuk goruntuleniyor" riskinin dogrulanmis hali -
+   cozum tahminle esik oynamak degil, kamera konumlandirma/ROI.
+3. Bu iki bulgu birbiriyle geriliyor: `conf_threshold`'u yazici yanlis
+   alarmini bastiracak kadar yukseltmek (>0.65), `bucket11`'deki zaten zayif
+   (0.64 guvenli) gercek tespiti de bastirir. Tek bir global esik degeri
+   ile ikisini ayni anda cozmek bu model icin mumkun degil - kamera bazinda
+   ROI/konum ayari sart.
