@@ -107,6 +107,13 @@ class FrameSource:
             log(f"HATA: kaynak acilamadi: {self.source}")
 
     def frames(self):
+        # Dosyadan okuma ile RTSP'den okuma farkli davranmali: RTSP grab()
+        # gercek zamanda ag akisini tuketir, bu yuzden fazladan grab() ile
+        # birikmis eski kareler atlanabilir. Video dosyasinda grab() aninda
+        # doner - ayni mantik uygulanirsa saniyeler icinde dosyanin sonuna
+        # gelinir ve EOF, kopan baglanti sanilip yeniden acilir. Bu yuzden
+        # dosya kaynaginda atlama yapilmaz, sadece sleep ile hiz ayarlanir.
+        is_file = isinstance(self.source, str) and os.path.isfile(self.source)
         frame_interval = 1.0 / self.target_fps
         last_grab = 0.0
 
@@ -115,26 +122,36 @@ class FrameSource:
                 log(f"kaynaga baglaniliyor: {self.source}")
                 self._open()
                 if self.cap is None or not self.cap.isOpened():
+                    if is_file:
+                        log("dosya acilamadi, durduruluyor")
+                        return
                     time.sleep(self.reconnect_wait)
                     continue
 
             # RTSP buffer birikimini onlemek icin grab() ile en guncel kareye atla
             ok = self.cap.grab()
             if not ok:
+                if is_file:
+                    log("dosyanin sonuna ulasildi")
+                    return
                 log("kare alinamadi, yeniden baglaniliyor")
                 self.cap.release()
                 self.cap = None
                 time.sleep(self.reconnect_wait)
                 continue
 
-            now = time.monotonic()
-            if now - last_grab < frame_interval:
-                continue
-            last_grab = now
+            if not is_file:
+                now = time.monotonic()
+                if now - last_grab < frame_interval:
+                    continue
+                last_grab = now
 
             ok, frame = self.cap.retrieve()
             if not ok or frame is None:
                 continue
+
+            if is_file:
+                time.sleep(frame_interval)
 
             yield frame
 
