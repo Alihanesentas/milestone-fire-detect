@@ -61,6 +61,7 @@ python fire_watch.py
 |---|---|
 | `--source` | RTSP url veya video dosyasi (config'i ezer) |
 | `--show` | Goruntuyu pencerede goster, guven skorlarini bas |
+| `--boxes` | `--show` ile birlikte bounding box ciz (yalnizca yerel debug penceresi, XProtect'e giden veriye etkisi yok) |
 | `--dry-run` | Olay gonderme, sadece logla |
 
 ## Dokumanlar

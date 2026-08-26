@@ -176,10 +176,14 @@ class Detector:
     def detect(self, frame):
         """Karede en yuksek guvenli fire/smoke tespitini dondurur.
 
-        Donus: (kind, confidence) ya da (None, 0.0). kind "fire" ya da "smoke".
+        Donus: (kind, confidence, detections). kind "fire"/"smoke" ya da None,
+        confidence None ise 0.0. detections, --boxes debug gorunumu icin
+        (kind, conf, (x1, y1, x2, y2)) uclulerinin listesi - XProtect'e
+        gonderilen veriye etkisi yok, sadece yerel gosterim icin.
         """
         results = self.model.predict(frame, verbose=False)
         best_kind, best_conf = None, 0.0
+        detections = []
 
         for result in results:
             boxes = result.boxes
@@ -198,10 +202,13 @@ class Detector:
                 else:
                     continue
 
+                xyxy = tuple(int(v) for v in box.xyxy[0])
+                detections.append((kind, conf, xyxy))
+
                 if conf > best_conf:
                     best_kind, best_conf = kind, conf
 
-        return best_kind, best_conf
+        return best_kind, best_conf, detections
 
 
 class Confirmer:
@@ -245,7 +252,10 @@ class Confirmer:
 EVENT_TYPE = {"fire": "Fire Detected", "smoke": "Smoke Detected"}
 
 
-def run(config, source_override=None, show=False, dry_run=False):
+BOX_COLOR = {"fire": (0, 0, 255), "smoke": (200, 200, 200)}
+
+
+def run(config, source_override=None, show=False, dry_run=False, boxes=False):
     sender = EventSender(
         host=config["event_server"],
         port=config["event_port"],
@@ -282,10 +292,19 @@ def run(config, source_override=None, show=False, dry_run=False):
                 sender.send("Analytics Heartbeat", "servis calisiyor")
                 last_heartbeat = now
 
-            kind, conf = detector.detect(frame)
+            kind, conf, detections = detector.detect(frame)
             alarm_kind, hits = confirmer.update(kind)
 
             if show:
+                if boxes:
+                    # Sadece yerel debug penceresi icin - XProtect'e giden
+                    # olay verisine (EventSender) bu kutular hic dokunmuyor.
+                    for det_kind, det_conf, (x1, y1, x2, y2) in detections:
+                        color = BOX_COLOR[det_kind]
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                        cv2.putText(frame, f"{det_kind} {det_conf:.2f}", (x1, max(0, y1 - 8)),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
                 label = f"{kind} ({conf:.2f})" if kind else "-"
                 text = f"tespit: {label}  pencere: fire={sum(confirmer.history['fire'])} smoke={sum(confirmer.history['smoke'])}"
                 cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
@@ -319,6 +338,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Milestone yangin/duman tespit servisi")
     parser.add_argument("--source", help="RTSP url veya video dosyasi (config'i ezer)")
     parser.add_argument("--show", action="store_true", help="Goruntuyu pencerede goster")
+    parser.add_argument("--boxes", action="store_true",
+                         help="--show ile birlikte bounding box ciz (sadece yerel, XProtect'e gitmez)")
     parser.add_argument("--dry-run", action="store_true", help="Olay gonderme, sadece logla")
     return parser.parse_args()
 
@@ -326,4 +347,4 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     cfg = load_config()
-    run(cfg, source_override=args.source, show=args.show, dry_run=args.dry_run)
+    run(cfg, source_override=args.source, show=args.show, dry_run=args.dry_run, boxes=args.boxes)
