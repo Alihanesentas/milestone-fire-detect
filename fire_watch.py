@@ -17,6 +17,8 @@ from collections import deque
 from datetime import datetime
 
 import cv2
+import numpy as np
+import torch
 import yaml
 from ultralytics import YOLO
 
@@ -169,9 +171,25 @@ class Detector:
         self.fire_labels = {label.lower() for label in fire_labels}
         self.smoke_labels = {label.lower() for label in smoke_labels}
 
+        device = self._pick_device()
+        self.model.to(device)
+        # MPS/CUDA ilk cagride kernel derliyor (birkac saniye surebilir) -
+        # bunu servis basinda bir kere yapip donguyu yavaslatmamak icin isit
+        self.model.predict(
+            np.zeros((640, 640, 3), dtype=np.uint8), verbose=False, device=device
+        )
+
         names = self.model.names
-        log(f"model yuklendi: {model_path}")
+        log(f"model yuklendi: {model_path} (cihaz: {device})")
         log(f"model sinif isimleri: {list(names.values())}")
+
+    @staticmethod
+    def _pick_device():
+        if torch.backends.mps.is_available():
+            return "mps"
+        if torch.cuda.is_available():
+            return "cuda"
+        return "cpu"
 
     def detect(self, frame):
         """Karede en yuksek guvenli fire/smoke tespitini dondurur.
