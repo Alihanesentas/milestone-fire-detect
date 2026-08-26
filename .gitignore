@@ -1,0 +1,8 @@
+config.yaml
+*.pt
+*.onnx
+*.mp4
+__pycache__/
+*.pyc
+.venv/
+logs/

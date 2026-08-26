@@ -1,0 +1,22 @@
+# Bu dosyayi config.yaml olarak kopyalayip doldur.
+
+# --- Video kaynagi ---
+rtsp_url: "rtsp://kullanici:sifre@192.168.1.50:554/Streaming/Channels/101"
+target_fps: 4.0            # saniyede kac kare islenecek
+
+# --- XProtect ---
+event_server: "192.168.1.10"   # Event Server IP'si. Yerel test icin 127.0.0.1
+event_port: 9090
+source_name: "192.168.1.50"    # XProtect'teki kamera ADI veya IP'si - birebir eslesmeli
+heartbeat_sec: 60
+
+# --- Model ---
+model_path: "fire_smoke.pt"
+conf_threshold: 0.45
+fire_labels: ["fire", "flame", "flames"]
+smoke_labels: ["smoke", "smoky"]
+
+# --- Zamansal dogrulama ---
+window: 8                  # kayan pencere boyutu (kare)
+min_hits: 5                # alarm icin penceredeki min pozitif kare
+cooldown_sec: 300          # alarm sonrasi sessizlik suresi
